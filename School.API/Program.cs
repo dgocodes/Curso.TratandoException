@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using School.API.Context;
+using School.API.Exceptions.Middleware;
 using School.API.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -25,6 +26,10 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseAuthorization();
+
+//Exception Handlers 
+//app.ConfigureBuildInExceptionHandler();
+app.ConfigureCustomExceptionHandler();
 
 app.MapControllers();
 

@@ -1,19 +1,17 @@
 ﻿#nullable disable
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using School.API.Context;
+using School.API.Exceptions;
+using School.API.Exceptions.Filters;
 using School.API.Models;
+using School.API.ViewModels;
 
 namespace School.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class StudentsController : ControllerBase
+    public class StudentsController : BaseController
     {
         private readonly AppDBContext _context;
 
@@ -24,10 +22,13 @@ namespace School.API.Controllers
 
         // GET: api/Students
         [HttpGet]
+        [CustomExceptionFilter]
         public async Task<ActionResult<IEnumerable<Student>>> GetStudents()
         {
-            return await _context.Students.ToListAsync();
+            throw new Exception("Testando o CustomExceptionFilter");
+            return await CreateResponse(async () => await _context.Students.ToListAsync());
         }
+
 
         // GET: api/Students/5
         [HttpGet("{id}")]
@@ -77,12 +78,37 @@ namespace School.API.Controllers
         // POST: api/Students
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Student>> PostStudent(Student student)
+        public async Task<ActionResult<Student>> PostStudent(CreateStudentViewModel student)
         {
-            _context.Students.Add(student);
-            await _context.SaveChangesAsync();
+            try
+            {
+                var studentByEmail = _context.Students.FirstOrDefault(x => x.Email == student.Email);
 
-            return CreatedAtAction("GetStudent", new { id = student.Id }, student);
+                if (studentByEmail != null)
+                    throw new EmailAlreadyRegistredException("E-mail already registred", student.Email);
+
+                if (student.Age <= 5)
+                    throw new MinimumAgeException($"Age invalid", student.Age);
+
+                var newStudent = student.FromModel();
+
+                _context.Students.Add(newStudent);
+                await _context.SaveChangesAsync();
+
+                return CreatedAtAction("GetStudent", new { id = newStudent.Id }, newStudent);
+            }
+            catch (EmailAlreadyRegistredException ex)
+            {
+                return BadRequest($"{ex.Email} already registred.");
+            }
+            catch (MinimumAgeException ex)
+            {
+                return BadRequest($"Age must be greater than 5 - current age {ex.Age}");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex);
+            }
         }
 
         // DELETE: api/Students/5
